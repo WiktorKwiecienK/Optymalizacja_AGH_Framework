@@ -1,0 +1,3 @@
+C:/Users/xtron/Desktop/Optymalizacja/Optymalizacja/cmake-build-debug/CMakeFiles/Optymalizacja.dir
+C:/Users/xtron/Desktop/Optymalizacja/Optymalizacja/cmake-build-debug/CMakeFiles/edit_cache.dir
+C:/Users/xtron/Desktop/Optymalizacja/Optymalizacja/cmake-build-debug/CMakeFiles/rebuild_cache.dir
