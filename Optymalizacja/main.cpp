@@ -8,6 +8,8 @@ Akademia G?rniczo-Hutnicza
 Data ostatniej modyfikacji: 30.09.2025
 *********************************************/
 
+#include <iomanip>
+
 #include"opt_alg.h"
 
 void lab0();
@@ -314,55 +316,17 @@ void lab2()
 
         int num_tests = 100;
 
-        for (int i = 0; i < num_tests; ++i)
-        {
-            // Losowy punkt startowy z [-1, 1] x [-1, 1]
-            double x1_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
-            double x2_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
-
-			cout<<"P_S = ["<<x1_start<<","<<x2_start<<endl;
-
-        	matrix x0(2, 1);
-            x0(0) = x1_start;
-            x0(1) = x2_start;
-
-
-            solution::clear_calls();
-            double s_HJ = 0.1;
-            double alpha_HJ = 0.5;
-
-            solution result_HJ = HJ(ff2T, x0, s_HJ, alpha_HJ, epsilon, Nmax, NAN, NAN);
-			cout<<"result_HJ = "<<result_HJ<<endl;
-            int fcalls_HJ = solution::f_calls;
-
-            solution::clear_calls();
-        	matrix s0_Rosen(2, 1);
-            s0_Rosen(0) = 0.1;
-            s0_Rosen(1) = 0.1;
-        	double alpha_Rosen = 2.0;
-            double beta_Rosen = 0.5;
-
-            solution result_Rosen = Rosen(ff2T, x0, s0_Rosen, alpha_Rosen, beta_Rosen, epsilon, Nmax, NAN, NAN);
-
-        	cout<<"Result Rosen = "<<result_Rosen<<endl<<endl;
-
-            int fcalls_Rosen = solution::f_calls;
-
-
-        }
-
-        cout << "\n===== TESTY DLA RÓŻNYCH DŁUGOŚCI KROKU =====" << endl;
-
+        cout << "\n===== TESTY DLA RÓ?NYCH D?UGO?CI KROKU =====" << endl;
         double step_sizes[3] = {0.5, 0.1, 0.01};
 
-    	// ofstream fout2("lab2_kroki.csv");
-       // fout2 << "Step_size;Method;Run;x1_start;x2_start;x1_opt;x2_opt;y_opt;f_calls\n";
+    	 ofstream fout2("lab2_tabela1.csv");
+        fout2 << "Step_size;i;x1_start;x2_start;x1_HJ;x2_HJ;y_HS;f_calls;lokalne/globalne;x1_ROS;x2_ROS;y_ROS;f_calls;globalne/lokalne\n";
 
         for (int s_idx = 0; s_idx < 3; ++s_idx)
         {
             double step = step_sizes[s_idx];
 
-            cout << "\nDługość kroku s = " << step << endl;
+            cout << "\nD?ugo?? kroku s = " << step << endl;
 
             for (int i = 0; i < num_tests; ++i)
             {
@@ -382,12 +346,45 @@ void lab2()
                 s0(0) = step;
                 s0(1) = step;
                 solution result_Rosen = Rosen(ff2T, x0, s0, 2.0, 0.5, epsilon, Nmax, NAN, NAN);
+
+			//	cout<<"RP = ("<<x1_start<<";"<<x2_start<<")\n";
+            //	cout<<"HJ = ("<<result_HJ.x<<")\n";
+            //	cout<<"R = ("<<result_Rosen.x<<")\n\n";
+				// cout<<get_row(result_Rosen.x, 0)<<";"<<get_row(result_Rosen.x,1)<<endl<<endl;
+				// fout2<<step<<";"<<i<<";"<<get_row(result_Rosen.x,0)<<get_row(result_Rosen.x,1)<<endl;
+
+
+				double x1_HJ = m2d(get_row(result_HJ.x, 0));
+            	double x2_HJ = m2d(get_row(result_HJ.x, 1));
+
+            	double x1_R = m2d(get_row(result_Rosen.x, 0));
+            	double x2_R = m2d(get_row(result_Rosen.x, 1));
+
+            	bool isGlobalHJ = false;
+            	bool isGlobalRosen = false;
+
+            	if (fabs(x1_HJ) < 0.25 && fabs(x2_HJ) < 0.25)
+            		isGlobalHJ = true;
+
+            	if (fabs(x1_R) < 0.25 && fabs(x2_R) < 0.25)
+            		isGlobalRosen = true;
+
+            	string minHJ = isGlobalHJ ? "globalne" : "lokalne";
+            	string minRosen = isGlobalRosen ? "globalne" : "lokalne";
+
+
+				fout2<<step<<";"<<i<<";"
+				<<x1_start<<";"<<x2_start<<";"
+            	<<x1_HJ<<";"<<x2_HJ<<";"<< (double)m2d(result_HJ.y) <<";"
+            	<<result_HJ.f_calls<<";"<<minHJ<<";"<<x1_R<<";"<<x2_R
+            	<<";"<<(double)m2d(result_Rosen.y)<<";"<<result_Rosen.f_calls<< ";"<<minRosen<<endl;
             }
         }
+	fout2.close();
     }
     catch (string ex_info)
     {
-        cerr << "Błąd: " << ex_info << endl;
+        cerr << "B??d: " << ex_info << endl;
     }
 }
 

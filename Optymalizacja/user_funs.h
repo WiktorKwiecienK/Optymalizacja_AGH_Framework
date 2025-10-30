@@ -13,3 +13,4 @@ matrix ff_test(matrix, matrix = NAN, matrix = NAN);
 //
 
 matrix ff_tanks(matrix x, matrix ud1 = NAN, matrix ud2 = NAN);
+matrix ff2T(matrix x, matrix ud1 = NAN, matrix ud2 = NAN);
