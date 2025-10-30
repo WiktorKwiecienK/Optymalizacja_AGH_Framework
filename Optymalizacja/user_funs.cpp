@@ -1,4 +1,4 @@
-﻿#include"user_funs.h"
+#include"user_funs.h"
 
 matrix ff0T(matrix x, matrix ud1, matrix ud2)				// funkcja celu dla przypadku testowego
 {
@@ -43,15 +43,15 @@ matrix ff_test(matrix x, matrix ud1, matrix ud2)
 }
 
 
-//wersja wiktorowa modelu RR
+
 matrix ff_tanks(matrix x, matrix ud1, matrix ud2)
 {
-	//dla przekazanego x(0,0) -> zmienny przekroj A
+
 	double D_A_cm2 = x(0, 0);
 	if (D_A_cm2 < 1.0 || D_A_cm2 > 100.0)
-		return matrix(1e10); // kara za wyjście poza przedział
+		return matrix(1e10);
 
-	double D_A = D_A_cm2 / 10000.0; // cm² → m²
+	double D_A = D_A_cm2 / 10000.0;
 
 	const double P_A = 2.0, V_A0 = 5.0, T_A0 = 95.0;
 	const double P_B = 1.0, V_B0 = 1.0, T_B0 = 20.0;
@@ -75,10 +75,9 @@ matrix ff_tanks(matrix x, matrix ud1, matrix ud2)
 		V_A -= flow_A_to_B * dt;
 		V_B += (flow_A_to_B + F_in - flow_B_out) * dt;
 
-		// przed obliczeniem dT_dt:
+
 		if (V_B < 1e-8) V_B = 1e-8;
 
-		// ZMIANA TEMPERATURY W KROKU
 		double dT_dt = (flow_A_to_B * (T_A - T_B) + F_in * (T_in - T_B)) / V_B;
 		T_B += dT_dt * dt;
 
@@ -87,5 +86,21 @@ matrix ff_tanks(matrix x, matrix ud1, matrix ud2)
 		if (V_B < 0) V_B = 0;
 	}
 
-	return matrix(abs(max_T_B - 50.0)); // minimalizujemy błąd względem 50°C
+	return matrix(abs(max_T_B - 50.0));
 }
+
+
+// Funkcja testowa z lab2 - f(x1, x2) = x1^2 + x2^2 - cos(2.5πx1) - cos(2.5πx2) + 2
+matrix ff2T(matrix x, matrix ud1, matrix ud2)
+{
+	double x1 = x(0, 0);
+	double x2 = x(1, 0);
+
+	double val = pow(x1, 2) + pow(x2, 2)
+				 - cos(2.5 * M_PI * x1)
+				 - cos(2.5 * M_PI * x2)
+				 + 2.0;
+
+	return matrix(val);
+}
+
