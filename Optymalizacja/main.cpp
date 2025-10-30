@@ -12,16 +12,11 @@ Data ostatniej modyfikacji: 30.09.2025
 
 void lab0();
 void lab1();
-
-	void zadanie_5a();
-	void zadanie_5b();
-
 void lab2();
 void lab3();
 void lab4();
 void lab5();
 void lab6();
-
 
 //void lab1_test_function();
 
@@ -31,22 +26,7 @@ int main()
 {
 	try
 	{
-
-		//lab1();
-
-	//	double test_Da = 50.0;
-	//	cout<< "\n\nTest DA = " << test_Da <<"\n\n"; <sprawdza poprawno?? modelu (dla Da = 50 T_max ~= 62.5)
-	//	test_DA(test_Da);
-
-
-		// ???
-	//zadanie_5a();
-
-		//archiwalna
-		//lab1_kacper();
-
-		zadanie_5b();
-
+		lab2();
 	}
 	catch (string EX_INFO)
 	{
@@ -89,140 +69,56 @@ void lab0()
 	Y[0].~matrix();											// usuwamy z pami?ci rozwi?zanie RR
 	Y[1].~matrix();
 }
-//ZADANIE PROBLEM RZECZYWISTY
-
-
-void zadanie_5a()
-{
-	srand(time(NULL)); // losowo?? punkt�w startowych
-
-	const int N = 100;
-	const double eps = 1e-5;
-	const int Nmax = 1000;
-	const double d = 10.0;
-	const double lag_lambda = 1.0;
-	const int lag_iter = 100;
-
-	double alphas[3] = {1.2, 1.5, 2.0};
-
-	ofstream fout("wyniki_zadanie_5a.csv");
-	fout << "alpha;run;x0;FIB_x;FIB_y;FIB_calls;LAG_x;LAG_y;LAG_calls;FIBexp_x;FIBexp_y;FIBexp_calls;LAGexp_x;LAGexp_y;LAGexp_calls" << endl;
-
-	for (int a = 0; a < 3; ++a)
-	{
-		double alpha = alphas[a];
-
-		for (int i = 0; i < N; ++i)
-		{
-			double x0 = 1.0 + (rand() / (double)RAND_MAX) * 99.0; // losowy punkt startowy z [1,100]
-
-			// Bez ekspansji
-			solution Sfib = fib(ff_test, 0, 100, eps, NAN, NAN);
-			solution Slag = lag(ff_test, 0, 100, eps, lag_lambda, lag_iter, NAN, NAN);
-			cout<<"Punkt startowy losowy = "<<x0<<endl;
-			// Z ekspansj?
-			double* interval = expansion(ff_test, x0, d, alpha, Nmax, NAN, NAN);
-
-			cout<<"Ekspansja :"<<interval[0]<<" - "<<interval[1]<<" Dla alpha = "<<alpha<<endl;
-			solution SeFib = fib(ff_test, interval[0], interval[1], eps, NAN, NAN);
-			cout<<SeFib<<endl<<endl;
-
-			//solution SeLag = lag(ff_test, interval[0], interval[1], eps, lag_lambda, lag_iter, NAN, NAN);
-
-			//cout<<"LAG => "<<SeLag<<endl;
-			// Zapis do pliku
-			// fout << fixed << setprecision(6)
-			// << alpha << ";" << i + 1 << ";" << x0 << ";"
-			// << Sfib.x << ";" << Sfib.y << ";" << Sfib.f_calls << ";"
-			// << Slag.x << ";" << Slag.y << ";" << Slag.f_calls << ";"
-			// << SeFib.x << ";" << SeFib.y << ";" << SeFib.f_calls << ";"
-			// << SeLag.x << ";" << SeLag.y << ";" << SeLag.f_calls << endl;
-
-			delete[] interval;
-		}
-	}
-
-	fout.close();
-	cout << "Zapisano wyniki do pliku: wyniki_zadanie_5a.csv" << endl;
-}
-
-
-
-void zadanie_5b()
-{
-	const double eps = 1e-5;
-	const double gamma = 1.0;
-	const int Nmax = 100;
-
-	// === OPTIMALIZACJA ===
-	solution Sfib = fib(ff_tanks, 1.0, 100.0, eps, NAN, NAN);
-	solution Slag = lag(ff_tanks, 1.0, 100.0, eps, gamma, Nmax, NAN, NAN);
-
-	// === ZAPIS DO TABELI 3 ===
-	ofstream fout("tabela3.csv");
-	fout << "Metoda;x;y;f_calls\n";
-	fout << fixed << setprecision(6);
-	fout << "Fibonacci;" << Sfib.x(0,0) << ";" << Sfib.y(0,0) << ";" << Sfib.f_calls << "\n";
-	fout << "Lagrange;" << Slag.x(0,0) << ";" << Slag.y(0,0) << ";" << Slag.f_calls << "\n";
-	fout.close();
-	cout << "Zapisano wyniki optymalizacji do pliku: tabela3.csv" << endl;
-
-	// === SYMULACJA DLA OPTYMALNEGO D_A ===
-	double D_A_cm2 = Sfib.x(0,0); // lub Slag.x(0,0) je?li chcesz por�wna?
-
-	const double P_A = 2.0, V_A0 = 5.0, T_A0 = 95.0;
-	const double P_B = 1.0, V_B0 = 1.0, T_B0 = 20.0;
-	const double D_B = 36.5665 / 10000.0;
-	const double F_in = 0.01, T_in = 20.0;
-	const double a = 0.98, b = 0.63, g = 9.81;
-	const double dt = 1.0, t_end = 2000.0;
-
-	double D_A = D_A_cm2 / 10000.0;
-	double V_A = V_A0, T_A = T_A0;
-	double V_B = V_B0, T_B = T_B0;
-
-	ofstream fsim("symulacja.csv");
-	fsim << "t;T_B;V_A;V_B\n";
-
-	for (double t = 0; t <= t_end; t += dt)
-	{
-		double h_A = V_A / P_A;
-		double h_B = V_B / P_B;
-
-		double flow_A_to_B = a * b * D_A * sqrt(2 * g * h_A);
-		double flow_B_out  = a * b * D_B * sqrt(2 * g * h_B);
-
-		V_A -= flow_A_to_B * dt;
-		V_B += (flow_A_to_B + F_in - flow_B_out) * dt;
-
-		if (V_B < 1e-8) V_B = 1e-8;
-
-		double dT_dt = (flow_A_to_B * (T_A - T_B) + F_in * (T_in - T_B)) / V_B;
-		T_B += dT_dt * dt;
-
-		if (V_A < 0) V_A = 0;
-		if (V_B < 0) V_B = 0;
-
-		fsim << t << ";" << T_B << ";" << V_A << ";" << V_B << "\n";
-	}
-
-	fsim.close();
-	cout << "Zapisano przebieg symulacji do pliku: symulacja.csv" << endl;
-}
-
-
-//ZADANIE Z FUNKCJA TESTOWA
-
-
 
 void lab1()
 {
 	try
 	{
+		srand(time(NULL));
+
+		int N = 100;
+		double eps = 1e-5;
+		int Nmax = 200;
+		double d = 5.0;
+		double lag_lambda = 5.0;
+		int lag_iter = 100;
+
+		double alphas[3] = {1.2, 1.5, 2.0};
+
+		ofstream fout("tabela1.csv");
+		fout << "alpha;run;x0;a;b;FIB_x;FIB_y;LAG_x;LAG_y\n";
+
+		for (int a = 0; a < 3; ++a)
+		{
+			double alpha = alphas[a];
+
+			for (int i = 0; i < N; ++i)
+			{
+				double x0 = 1.0 + (rand() / (double)RAND_MAX) * 99.0;
+
+				double* interval = expansion(ff_test, x0, d, alpha, Nmax, NAN, NAN);
+				double a_exp = interval[0];
+				double b_exp = interval[1];
+
+				solution SeFib = fib(ff_test, a_exp, b_exp, eps, NAN, NAN);
+				solution SeLag = lag(ff_test, a_exp, b_exp, eps, lag_lambda, lag_iter, NAN, NAN);
+
+				fout << fixed << setprecision(3)
+					 << alpha << ";" << i + 1 << ";" << x0 << ";"
+					 << a_exp << ";" << b_exp << ";"
+					 << SeFib.x(0,0) << ";" << SeFib.y(0,0) << ";"
+					 << SeLag.x(0,0) << ";" << SeLag.y(0,0) << "\n";
+
+				delete[] interval;
+			}
+		}
+
+		fout.close();
+		cout << "Zapisano dane do pliku: tabela1.csv" << endl;
 
 		cout << "=====>>>>> FUNKCJA TESTOWA <<<<<<=====" << endl;
 
-		//Lag() i Fib() Dla przedzialu 0 - 100
+
 		cout << "===== METODA FIBONACCIEGO =====" << endl;
 		solution Sfib = fib(ff_test, 0, 100, 1e-5, NAN, NAN);
 		cout << "Minimum (Fibonacci):" << endl;
@@ -241,9 +137,9 @@ void lab1()
 
 		cout << "\n===== METODA EKSPANSJI =====" << endl;
 		double x0 = 50.0;
-		double d = 7.0;
+		 d = 7.0;
 		double alpha = 1.5;
-		int Nmax = 1000;
+		Nmax = 1000;
 
 		double* interval = expansion(ff_test, x0, d, alpha, Nmax, NAN, NAN);
 		cout << "Przedzia? po ekspansji: [" << interval[0] << ", " << interval[1] << "]" << endl;
@@ -258,20 +154,11 @@ void lab1()
 		cout << "Minimum (Lagrange'a po ekspansji):" << endl;
 		cout << Selag << endl;
 
-
-		cout<<"<><><><><> ZADANIE Z FUNKCJA TESTOWA <><><><><><><>\n\n";
-		zadanie_5a();
-
-		//delete[] interval;
-
 		// ------------------ZBIORNIKI----------------------
-
 		cout << "\n\n=====>>>>> ZADANIE ZE ZBIORNIKAMI <<<<<<=====" << endl;
 
 		cout << "\n===== TEST MAKSYMALNEJ TEMPERATURY dla DA = 50cm^2 =====" << endl;
 		test_DA(50.0);
-
-
 
 		cout << "\n===== METODA EKSPANSJI =====" << endl;
 
@@ -292,7 +179,60 @@ void lab1()
 		cout << Slag << endl;
 
 		delete[] interval;
-		
+
+
+
+		  eps = 1e-5;
+		 double gamma = 1.0;
+		 Nmax = 100;
+
+		// === OPTIMALIZACJA ===
+		 Sfib = fib(ff_tanks, 1.0, 100.0, eps, NAN, NAN);
+		 Slag = lag(ff_tanks, 1.0, 100.0, eps, gamma, Nmax, NAN, NAN);
+
+		// === SYMULACJA DLA OPTYMALNEGO D_A ===
+		double D_A_cm2 = Sfib.x(0,0);
+
+		const double P_A = 2.0, V_A0 = 5.0, T_A0 = 95.0;
+		const double P_B = 1.0, V_B0 = 1.0, T_B0 = 20.0;
+		const double D_B = 36.5665 / 10000.0;
+		const double F_in = 0.01, T_in = 20.0;
+		const double a = 0.98, b = 0.63, g = 9.81;
+		const double dt = 1.0, t_end = 2000.0;
+
+		double D_A = D_A_cm2 / 10000.0;
+		double V_A = V_A0, T_A = T_A0;
+		double V_B = V_B0, T_B = T_B0;
+
+		ofstream fsim("symulacja.csv");
+		fsim << "t;T_B_FIb;V_A_Fib;V_B_Fib\n";
+
+		for (double t = 0; t <= t_end; t += dt)
+		{
+			double h_A = V_A / P_A;
+			double h_B = V_B / P_B;
+
+			double flow_A_to_B = a * b * D_A * sqrt(2 * g * h_A);
+			double flow_B_out  = a * b * D_B * sqrt(2 * g * h_B);
+
+			V_A -= flow_A_to_B * dt;
+			V_B += (flow_A_to_B + F_in - flow_B_out) * dt;
+
+			if (V_B < 1e-8) V_B = 1e-8;
+
+			double dT_dt = (flow_A_to_B * (T_A - T_B) + F_in * (T_in - T_B)) / V_B;
+			T_B += dT_dt * dt;
+
+			if (V_A < 0) V_A = 0;
+			if (V_B < 0) V_B = 0;
+
+			if ((int)t%10 == 0)
+				fsim << t << ";" << T_B << ";" << V_A << ";" << V_B << "\n";
+		}
+
+		fsim.close();
+		cout << "Zapisano przebieg symulacji do pliku: symulacja.csv" << endl;
+
 	}
 	catch (string ex_info)
 	{
@@ -311,7 +251,7 @@ void test_DA(double Da)
 	double D_A_cm2 = Da;
 
 	//Zbiornik A -> zmienny przekroj
-	double D_A = D_A_cm2 / 10000.0; // cm� ? m�
+	double D_A = D_A_cm2 / 10000.0; // cm² ? m²
 	const double P_A = 2.0, V_A0 = 5.0, T_A0 = 95.0;
 	//Zbiornik B
 	const double P_B = 1.0, V_B0 = 1.0, T_B0 = 20.0;
@@ -357,14 +297,98 @@ void test_DA(double Da)
 	fout.close();
 
 	cout << "Zapisano symulacj? do pliku: symulacja_DA_50.csv" << endl;
-	cout << "Maksymalna temperatura w zbiorniku B: " << max_T_B << " �C" << endl;
+	cout << "Maksymalna temperatura w zbiorniku B: " << max_T_B << " °C" << endl;
 
 }
 
 
 void lab2()
 {
+    try
+    {
+        srand(time(NULL));
 
+        int n = 2;
+        double epsilon = 1e-3;
+        int Nmax = 10000;
+
+        int num_tests = 100;
+
+        for (int i = 0; i < num_tests; ++i)
+        {
+            // Losowy punkt startowy z [-1, 1] x [-1, 1]
+            double x1_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
+            double x2_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
+
+			cout<<"P_S = ["<<x1_start<<","<<x2_start<<endl;
+
+        	matrix x0(2, 1);
+            x0(0) = x1_start;
+            x0(1) = x2_start;
+
+
+            solution::clear_calls();
+            double s_HJ = 0.1;
+            double alpha_HJ = 0.5;
+
+            solution result_HJ = HJ(ff2T, x0, s_HJ, alpha_HJ, epsilon, Nmax, NAN, NAN);
+			cout<<"result_HJ = "<<result_HJ<<endl;
+            int fcalls_HJ = solution::f_calls;
+
+            solution::clear_calls();
+        	matrix s0_Rosen(2, 1);
+            s0_Rosen(0) = 0.1;
+            s0_Rosen(1) = 0.1;
+        	double alpha_Rosen = 2.0;
+            double beta_Rosen = 0.5;
+
+            solution result_Rosen = Rosen(ff2T, x0, s0_Rosen, alpha_Rosen, beta_Rosen, epsilon, Nmax, NAN, NAN);
+
+        	cout<<"Result Rosen = "<<result_Rosen<<endl<<endl;
+
+            int fcalls_Rosen = solution::f_calls;
+
+
+        }
+
+        cout << "\n===== TESTY DLA RÓŻNYCH DŁUGOŚCI KROKU =====" << endl;
+
+        double step_sizes[3] = {0.5, 0.1, 0.01};
+
+    	// ofstream fout2("lab2_kroki.csv");
+       // fout2 << "Step_size;Method;Run;x1_start;x2_start;x1_opt;x2_opt;y_opt;f_calls\n";
+
+        for (int s_idx = 0; s_idx < 3; ++s_idx)
+        {
+            double step = step_sizes[s_idx];
+
+            cout << "\nDługość kroku s = " << step << endl;
+
+            for (int i = 0; i < num_tests; ++i)
+            {
+                double x1_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
+                double x2_start = -1.0 + (rand() / (double)RAND_MAX) * 2.0;
+                matrix x0(2, 1);
+                x0(0) = x1_start;
+                x0(1) = x2_start;
+
+                // HOOKE-JEEVES
+                solution::clear_calls();
+                solution result_HJ = HJ(ff2T, x0, step, 0.5, epsilon, Nmax, NAN, NAN);
+
+                // ROSENBROCK
+                solution::clear_calls();
+                matrix s0(2, 1);
+                s0(0) = step;
+                s0(1) = step;
+                solution result_Rosen = Rosen(ff2T, x0, s0, 2.0, 0.5, epsilon, Nmax, NAN, NAN);
+            }
+        }
+    }
+    catch (string ex_info)
+    {
+        cerr << "Błąd: " << ex_info << endl;
+    }
 }
 
 void lab3()
