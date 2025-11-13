@@ -1,11 +1,14 @@
 #include"user_funs.h"
 
+//l0
+//------------------
 matrix ff0T(matrix x, matrix ud1, matrix ud2)				// funkcja celu dla przypadku testowego
 {
 	matrix y;												// y zawiera wartość funkcji celu
 	y = pow(x(0) - ud1(0), 2) + pow(x(1) - ud1(1), 2);		// ud1 zawiera współrzędne szukanego optimum
 	return y;
 }
+
 matrix ff0R(matrix x, matrix ud1, matrix ud2)				// funkcja celu dla problemu rzeczywistego
 {
 	matrix y;												// y zawiera wartość funkcji celu
@@ -33,8 +36,8 @@ matrix df0(double t, matrix Y, matrix ud1, matrix ud2)
 }
 
 
-//funkcja testowa 5a
-matrix ff_test(matrix x, matrix ud1, matrix ud2)
+//test function l2
+	matrix ff_test(matrix x, matrix ud1, matrix ud2)
 {
 	double xv = x(0, 0);
 	double val = -cos(0.1 * xv) * exp(-pow(0.1 * xv - 2 * M_PI, 2))
@@ -91,16 +94,101 @@ matrix ff_tanks(matrix x, matrix ud1, matrix ud2)
 
 
 // Funkcja testowa z lab2 - f(x1, x2) = x1^2 + x2^2 - cos(2.5πx1) - cos(2.5πx2) + 2
+
 matrix ff2T(matrix x, matrix ud1, matrix ud2)
 {
-	double x1 = x(0, 0);
-	double x2 = x(1, 0);
-
-	double val = pow(x1, 2) + pow(x2, 2)
-				 - cos(2.5 * M_PI * x1)
-				 - cos(2.5 * M_PI * x2)
-				 + 2.0;
-
-	return matrix(val);
+	return matrix(
+		pow(x(0), 2) + pow(x(1), 2)
+		- cos(2.5 * M_PI * x(0))
+		- cos(2.5 * M_PI * x(1))
+		+ 2
+	);
 }
 
+matrix df2(double t, matrix Y, matrix ud1, matrix ud2)
+{
+	double m_r = 1.0;      // masa ramienia
+	double m_c = 5.0;      // masa ciężarka
+	double l = 2.0;        // długość ramienia (m)
+	double b = 0.25;       // współczynnik tarcia (Nms)
+
+	double I = (1.0 / 3.0 * m_r + m_c) * pow(l, 2);
+
+	double k1 = m2d(ud1);
+	double k2 = m2d(ud2);
+
+	double alpha_ref = M_PI;   // pozycja docelowa (rad)
+	double omega_ref = 0.0;    // prędkość docelowa (rad/s)
+
+	double alpha_error = alpha_ref - Y(0);
+	double omega_error = omega_ref - Y(1);
+
+	double M_t = k1 * alpha_error + k2 * omega_error;
+
+	matrix dY(2, 1);
+	dY(0) = Y(1);
+	dY(1) = (M_t - b * Y(1)) / I;
+
+	return dY;
+}
+
+matrix ff2R(matrix x, matrix ud1, matrix ud2)
+{
+	double k1 = x(0);
+	double k2 = x(1);
+
+	double t0 = 0.0;
+	double t_end = 100.0;
+	double dt = 0.1;
+
+	double alpha0 = 0.0;
+	double omega0 = 0.0;
+	matrix Y0 = matrix(2, new double[2]{alpha0, omega0});
+
+	matrix* res = solve_ode(df2, t0, dt, t_end, Y0, k1, k2);
+
+	double Q = 0.0;
+	for (int i = 0; i < get_len(res[0]); i++)
+	{
+		double alpha = res[1](i, 0);
+		double omega = res[1](i, 1);
+
+		double alpha_error = M_PI - alpha;
+		double omega_error = 0.0 - omega;
+
+		double M_t = k1 * alpha_error + k2 * omega_error;
+
+		Q += (10 * pow(alpha_error, 2)
+			+ pow(omega_error, 2)
+			+ pow(M_t, 2)) * dt;
+	}
+
+	delete[] res;
+
+	return matrix(Q);
+}
+
+// ------------------
+// lab3
+
+matrix g1(matrix x, matrix ud1)
+{
+	return 1 -x(0);
+}
+
+matrix g2(matrix x, matrix ud1)
+{
+	return  1 - x(1) ;
+}
+
+matrix g3(matrix x, matrix a)
+{
+	return sqrt(pow(x(0), 2) + pow(x(1), 2)) - m2d(a);
+}
+
+//f testowa
+
+
+
+
+//
