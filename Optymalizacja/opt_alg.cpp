@@ -1,5 +1,239 @@
 #include"opt_alg.h"
 
+#include <fstream>
+
+solution HJ_CSV(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double alpha, double epsilon, int Nmax,
+	matrix ud1, matrix ud2) {
+	{
+		try
+		{
+			vector<double> trajectoryX1;
+			vector<double> trajectoryX2;
+
+			cout << "\nHJ_CSV function\n";
+
+			solution Xopt, xs(x0);
+			matrix ud(x0);
+
+			xs.fit_fun(ff, ud1, ud2);
+			Xopt.flag = 0;
+
+			do {
+				solution xB = xs;
+
+				xs = HJ_trial(ff, xB, s, ud1, ud2);
+				xs.fit_fun(ff, ud1, ud2);
+
+				// Zapis aktualnego punktu
+				//	if (xs.x.size() >= 2) {
+				trajectoryX1.push_back(xs.x(0, 0));
+				trajectoryX2.push_back(xs.x(1, 0));
+				//	}
+
+				if (m2d(xs.y) < m2d(xB.y)) {
+					do {
+						solution _xB = xB;
+						xB = xs;
+						xs = (xB.x * 2.0) - _xB.x;
+						xs = HJ_trial(ff, xs, s, ud1, ud2);
+
+						// Zapis aktualnego punktu
+						//if (xs.x.size() >= 2) {
+						trajectoryX1.push_back(xs.x(0, 0));
+						trajectoryX2.push_back(xs.x(1, 0));
+						//}
+
+						if (solution::f_calls > Nmax) {
+							Xopt.flag = -1;
+							break;
+						}
+					} while (m2d(xs.y) < m2d(xB.y));
+					xs = xB;
+				}
+				else {
+					s = alpha * s;
+				}
+
+				if (solution::f_calls > Nmax) {
+					if (!Xopt.flag)
+						Xopt.flag = -2;
+					break;
+				}
+				ud.add_col(xs.x);
+			} while (s >= epsilon);
+
+			Xopt = xs;
+			Xopt.ud = ud;
+
+			// --- ZAPIS TRAJEKTORII DO PLIKU CSV ---
+			ofstream trajFile("trajectory_HJ.csv");
+			if (trajFile.is_open()) {
+				trajFile << "x1;x2\n";  // nagłówek kolumn
+				for (size_t i = 0; i < trajectoryX1.size(); ++i) {
+					trajFile << trajectoryX1[i] << ";" << trajectoryX2[i] << "\n";
+				}
+				trajFile.close();
+				cout << "Trajektoria zapisana do pliku trajectory_HJ.csv\n";
+			} else {
+				cerr << "Błąd: nie udało się otworzyć pliku trajectory.csv do zapisu.\n";
+			}
+
+			return Xopt;
+		}
+		catch (string ex_info) {
+			throw ("solution HJ(...):\n");
+		}
+	}
+}
+
+#include <fstream>  // do zapisu pliku CSV
+
+solution Rosen_CSV(matrix(*ff)(matrix, matrix, matrix), matrix x0, matrix s0, double alpha, double beta, double epsilon, int Nmax, matrix ud1, matrix ud2)
+{
+	try
+	{
+		const int DIM = 2;
+		matrix d(DIM, DIM);
+		matrix ud(x0);
+
+		for (int w = 0; w < DIM; w++)
+			for (int k = 0; k < DIM; k++)
+				d(w, k) = (w == k) ? 1 : 0;
+
+		matrix l(DIM, 1, 0.0);
+		matrix p(DIM, 1, 0.0);
+		matrix s(s0);
+
+		solution xB(x0);
+		xB.fit_fun(ff, ud1, ud2);
+		solution Xopt(xB);
+		Xopt.flag = 0;
+		int max_s;
+
+		// --- wektory do zapisu trajektorii ---
+		vector<double> trajectoryX1;
+		vector<double> trajectoryX2;
+		vector<double> trajectoryF;
+
+		// Zapis punktu początkowego
+		trajectoryX1.push_back(xB.x(0, 0));
+		trajectoryX2.push_back(xB.x(1, 0));
+		trajectoryF.push_back(m2d(xB.y));
+
+		do
+		{
+			for (int j = 0; j < DIM; j++)
+			{
+				solution _x(xB.x + s(j) * d[j]);
+				if (_x.fit_fun(ff, ud1, ud2) < xB.y)
+				{
+					xB = _x;
+					l(j) = l(j) + s(j);
+					s(j) = s(j) * alpha;
+				}
+				else
+				{
+					s(j) = -s(j) * beta;
+					p(j) = p(j) + 1;
+				}
+
+				// Zapis aktualnego punktu po każdej zmianie
+				trajectoryX1.push_back(xB.x(0, 0));
+				trajectoryX2.push_back(xB.x(1, 0));
+				trajectoryF.push_back(m2d(xB.y));
+			}
+
+			Xopt = xB;
+
+			bool zero = false;
+			for (int j = 0; j < DIM; j++)
+			{
+				if (p(j) == 0 || abs(l(j)) < epsilon) {
+					zero = true;
+					break;
+				}
+			}
+
+			if (!zero)
+			{
+				matrix _D(d);
+				matrix _lQ(DIM, DIM);
+
+				for (int i = 0; i < DIM; i++)
+					for (int j = 0; j < DIM; j++)
+						_lQ(i, j) = (i >= j) ? l(i) : 0.0;
+
+				_lQ = _D * _lQ;
+
+				matrix v(DIM, DIM);
+				v.set_col(_lQ[0] / (norm(_lQ[0])), 0);
+
+				for (int _j = 1; _j < DIM; _j++)
+				{
+					matrix sigma(DIM, 1);
+					matrix t_lQ(trans(_lQ[_j]));
+
+					for (int k = 0; k < _j; k++)
+					{
+						sigma.set_col(
+							sigma[0] + (t_lQ * d[k]) * d[k],
+							0);
+					}
+					matrix pk = _lQ[_j] - sigma[0];
+					v.set_col(pk / norm(pk), _j);
+				}
+
+				d = v;
+
+				l = matrix(DIM, 1, 0.0);
+				p = matrix(DIM, 1, 0.0);
+				s = s0;
+			}
+			if (solution::f_calls > Nmax)
+			{
+				Xopt.flag = -2;
+				break;
+			}
+			ud.add_col(Xopt.x);
+			max_s = 0;
+			for (int j = 1; j < DIM; j++)
+			{
+				if (abs(s(max_s)) < abs(s(j)))
+				{
+					max_s = j;
+				}
+			}
+
+		} while (abs(s(max_s)) >= epsilon);
+
+		Xopt.ud = ud;
+
+		// --- ZAPIS TRAJEKTORII DO PLIKU CSV ---
+		ofstream trajFile("trajectory_rosen.csv");
+		if (trajFile.is_open()) {
+
+			trajFile << "x1;x2;f\n";
+
+			for (size_t i = 0; i < trajectoryX1.size(); ++i) {
+				trajFile << trajectoryX1[i] << ";" << trajectoryX2[i] << ";" << trajectoryF[i] << "\n";
+			}
+
+			trajFile.close();
+			cout << "Trajektoria zapisana do pliku trajectory_rosen.csv\n";
+
+		}
+		else {
+			cerr << "Błąd: nie udało się otworzyć pliku trajectory_ROSEN.csv do zapisu.\n";
+		}
+		return Xopt;
+	}
+	catch (string ex_info)
+	{
+		throw ("solution Rosen_CSV(...):\n" + ex_info);
+	}
+}
+
+
 solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
 	// Zmienne wejściowe:
@@ -9,6 +243,7 @@ solution MC(matrix(*ff)(matrix, matrix, matrix), int N, matrix lb, matrix ub, do
 	// epslion - zakłądana dokładność rozwiązania
 	// Nmax - maksymalna liczba wywołań funkcji celu
 	// ud1, ud2 - user data
+
 	try
 	{
 		solution Xopt;
@@ -461,273 +696,251 @@ solution lag_zmodyfikowany(matrix(*ff)(matrix, matrix, matrix),
 }
 
 
-
 solution HJ(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double alpha, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
-    try
-    {
-        solution Xopt;
-        int n = get_len(x0);  // liczba zmiennych
+	try
+	{
+		solution Xopt, xs(x0);
+		matrix ud(x0);
 
-        solution XB(x0);  // punkt bazowy
-        XB.fit_fun(ff, ud1, ud2);
+		xs.fit_fun(ff, ud1, ud2);
+		Xopt.flag = 0;
+		do{
+			solution xB = xs;
 
-        solution XB_old(x0);  // poprzedni punkt bazowy
+			xs = HJ_trial(ff, xB, s, ud1, ud2);
+			xs.fit_fun(ff, ud1, ud2);
+			if (m2d(xs.y) < m2d(xB.y)){
+				do{
+					solution _xB = xB;
+					xB = xs;
+					xs = (xB.x * 2.0) - _xB.x;
+					xs = HJ_trial(ff, xs, s, ud1, ud2);
+					if (solution::f_calls > Nmax){
+						Xopt.flag = -1;
+						break;
+					}
+				} while (m2d(xs.y) < m2d(xB.y));
+				xs = xB;
+			}else{
+				s = alpha * s;
+			}
+			if (solution::f_calls > Nmax){
+				if(!Xopt.flag)
+					Xopt.flag = -2;
+				break;
+			}
+			ud.add_col(xs.x);
+		} while (s >= epsilon);
 
-        while (true)
-        {
-            solution X = HJ_trial(ff, XB, s, ud1, ud2);
-
-            if (solution::f_calls > Nmax)
-            {
-                Xopt = XB;
-                Xopt.flag = 0;
-                return Xopt;
-            }
-
-            if (X.y(0, 0) < XB.y(0, 0))
-            {
-                while (true)
-                {
-                    XB_old = XB;
-                    XB = X;
-
-                    matrix x_new = 2.0 * XB.x - XB_old.x;
-                    solution X_temp(x_new);
-                    X_temp.fit_fun(ff, ud1, ud2);
-
-                    X = HJ_trial(ff, X_temp, s, ud1, ud2);
-
-                    if (solution::f_calls > Nmax)
-                    {
-                        Xopt = XB;
-                        Xopt.flag = 0;
-                        return Xopt;
-                    }
-
-                    if (X.y(0, 0) >= XB.y(0, 0))
-                        break;
-                }
-
-                XB = X;
-            }
-            else
-            {
-                s = alpha * s;
-            }
-
-            if (s < epsilon)
-                break;
-        }
-
-        Xopt = XB;
-        Xopt.flag = 0;
-        return Xopt;
-    }
-    catch (string ex_info)
-    {
-        throw ("solution HJ(...):\n" + ex_info);
-    }
-}
-
-solution HJ_trial(matrix(*ff)(matrix, matrix, matrix), solution XB, double s, matrix ud1, matrix ud2)
-{
-    try
-    {
-        int n = get_len(XB.x);
-        matrix e_j(n, 1);
-
-        solution X = XB;
-
-        for (int j = 0; j < n; ++j)
-        {
-            for (int i = 0; i < n; ++i)
-                e_j(i) = (i == j) ? 1.0 : 0.0;
-
-            solution X_plus(X.x + s * e_j);
-            X_plus.fit_fun(ff, ud1, ud2);
-
-            if (X_plus.y(0, 0) < X.y(0, 0))
-            {
-                X = X_plus;
-            }
-            else
-            {
-                // Próba kroku w kierunku -e_j
-                solution X_minus(X.x - s * e_j);
-                X_minus.fit_fun(ff, ud1, ud2);
-
-                if (X_minus.y(0, 0) < X.y(0, 0))
-                {
-                    X = X_minus;
-                }
-            }
-        }
-
-        return X;
-    }
-    catch (string ex_info)
-    {
-        throw ("solution HJ_trial(...):\n" + ex_info);
-    }
-}
-
-
-solution Rosen(matrix(*ff)(matrix, matrix, matrix), matrix x0, matrix s0, double alpha, double beta, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-    try
-    {
-        solution Xopt;
-        int n = get_len(x0);
-
-        int i = 0;
-        matrix d(n, n);
-        for (int j = 0; j < n; ++j)
-            for (int k = 0; k < n; ++k)
-                d(j, k) = (j == k) ? 1.0 : 0.0;
-
-        matrix lambda(n, 1);
-        for (int j = 0; j < n; ++j)
-            lambda(j) = 0.0;
-
-        matrix p(n, 1);
-        for (int j = 0; j < n; ++j)
-            p(j) = 0.0;
-
-        matrix s = s0;
-        solution XB(x0);
-        XB.fit_fun(ff, ud1, ud2);
-
-        while (true)
-        {
-            for (int j = 0; j < n; ++j)
-            {
-                // Wektor kierunku d_j
-                matrix d_j = get_col(d, j);
-
-
-                solution X_plus(XB.x + s(j) * d_j);
-                X_plus.fit_fun(ff, ud1, ud2);
-
-                if (X_plus.y(0, 0) < XB.y(0, 0))
-                {
-                    XB = X_plus;
-                    lambda(j) = lambda(j) + s(j);
-                    s(j) = s(j) * alpha;
-                }
-                else
-                {
-
-                    solution X_minus(XB.x - s(j) * d_j);
-                    X_minus.fit_fun(ff, ud1, ud2);
-
-                    if (X_minus.y(0, 0) < XB.y(0, 0))
-                    {
-                        XB = X_minus;
-                        lambda(j) = lambda(j) - s(j);
-                        s(j) = s(j) * alpha;
-                    }
-                    else
-                    {
-
-                        s(j) = s(j) * beta;
-                        p(j) = p(j) + 1;
-                    }
-                }
-            }
-
-            i = i + 1;
-
-            if (solution::f_calls > Nmax)
-            {
-                Xopt = XB;
-                Xopt.flag = 0;
-                return Xopt;
-            }
-
-
-            bool change_basis = true;
-            for (int j = 0; j < n; ++j)
-            {
-                if (lambda(j) == 0.0 && p(j) == 0.0)
-                {
-                    change_basis = false;
-                    break;
-                }
-            }
-
-            if (change_basis)
-            {
-
-                matrix v(n, n);
-
-                for (int j = 0; j < n; ++j)
-                {
-                    matrix v_j(n, 1);
-                    for (int k = 0; k <= j; ++k)
-                    {
-                        matrix d_k = get_col(d, k);
-                        v_j = v_j + lambda(k) * d_k;
-                    }
-                    v.set_col(v_j, j);
-                }
-
-                for (int j = 0; j < n; ++j)
-                {
-                    matrix v_j = get_col(v, j);
-                    double norm_v = norm(v_j);
-
-                    if (norm_v > 1e-12)
-                    {
-                        matrix d_j_new = v_j * (1.0 / norm_v);
-                        d.set_col(d_j_new, j);
-                    }
-                }
-
-                // Reset lambda i p
-                for (int j = 0; j < n; ++j)
-                {
-                    lambda(j) = 0.0;
-                    p(j) = 0.0;
-                }
-
-
-                s = s0;
-            }
-
-//warunek stopu
-            double max_s = 0.0;
-            for (int j = 0; j < n; ++j)
-            {
-                if (fabs(s(j)) > max_s)
-                    max_s = fabs(s(j));
-            }
-
-            if (max_s < epsilon)
-                break;
-        }
-
-        Xopt = XB;
-        Xopt.flag = 0;
-        return Xopt;
-    }
-    catch (string ex_info)
-    {
-        throw ("solution Rosen(...):\n" + ex_info);
-    }
-}
-
-solution pen(matrix(*ff)(matrix, matrix, matrix), matrix x0, double c, double dc, double epsilon, int Nmax, matrix ud1, matrix ud2)
-{
-	try {
-		solution Xopt;
-		//Tu wpisz kod funkcji
-
+		Xopt = xs;
+		Xopt.ud = ud;
 		return Xopt;
 	}
 	catch (string ex_info)
 	{
-		throw ("solution pen(...):\n" + ex_info);
+		throw ("solution HJ(...):\n" + ex_info);
+	}
+}
+
+solution HJ_trial(matrix(*ff)(matrix, matrix, matrix), solution XB, double s, matrix ud1, matrix ud2)
+{
+	try{
+		int Wym = 2;
+        matrix dj(Wym, Wym);
+
+		for(int k = 0; k < Wym; k++) {
+			for (int l = 0; l < Wym; l++) {
+				if (l == k) {
+					dj(k, l) = 1;
+				}else {
+					dj(k, l) = 0;
+				}
+			}
+		}
+
+		for (int j = 0; j < Wym; j++){
+			solution xj = XB.x + (s * dj[j]);
+			xj.fit_fun(ff, ud1, ud2);
+			if ( xj.y < XB.y ){
+				XB = xj;
+			}else{
+				xj = XB.x - (s * dj[j]);
+				xj.fit_fun(ff, ud1, ud2);
+				if (xj.y < XB.y){
+					XB = xj;
+				}
+			}
+		}
+		return XB;
+	}
+	catch (string ex_info)
+	{
+		throw ("solution HJ_trial(...):\n" + ex_info);
+	}
+}
+
+solution Rosen(matrix(*ff)(matrix, matrix, matrix), matrix x0, matrix s0, double alpha, double beta, double epsilon, int Nmax, matrix ud1, matrix ud2)
+{
+	try
+	{
+
+		const int DIM = 2;
+		matrix d(DIM, DIM);
+		matrix ud(x0);
+
+		for (int w = 0; w < DIM; w++)
+			for (int k = 0; k < DIM; k++)
+				d(w, k) = (w == k) ? 1 : 0;
+
+		matrix l(DIM, 1, 0.0);
+		matrix p(DIM, 1, 0.0);
+		matrix s(s0);
+
+		solution xB(x0);
+		xB.fit_fun(ff, ud1, ud2);
+		solution Xopt(xB);
+		Xopt.flag = 0;
+		int max_s;
+		do
+		{
+			for (int j = 0; j < DIM; j++)
+			{
+				solution _x(xB.x + s(j) * d[j]);
+				if (_x.fit_fun(ff, ud1, ud2) <  xB.y)
+				{
+					xB = _x;
+					l(j) = l(j) + s(j);
+					s(j) = s(j) * alpha;
+				}
+				else
+				{
+					s(j) = -s(j) * beta;
+					p(j) = p(j) + 1;
+				}
+			}
+			Xopt = xB;
+
+			bool zero = false;
+			for (int j = 0; j < DIM; j++)
+			{
+				if (p(j) == 0 || abs(l(j)) < epsilon ) {
+					zero = true;
+					break;
+				}
+			}
+
+			if (!zero)
+			{
+				matrix _D(d);
+				matrix _lQ(DIM, DIM);
+
+				for (int i = 0; i < DIM; i++)
+					for (int j = 0; j < DIM; j++)
+						_lQ(i, j) = (i >= j) ? l(i) : 0.0;
+
+				_lQ = _D * _lQ;
+
+				matrix v(DIM,DIM);
+				v.set_col(_lQ[0]/(norm(_lQ[0])), 0);
+
+				for (int _j = 1; _j < DIM; _j++)
+				{
+					matrix sigma(DIM,1);
+					matrix t_lQ(trans(_lQ[_j]));
+
+					for (int k = 0; k < _j; k++)
+					{
+						sigma.set_col(
+							sigma[0] + (t_lQ * d[k]) * d[k],
+							0);
+					}
+					matrix pk = _lQ[_j] - sigma[0];
+					v.set_col(pk/norm(pk), _j);
+				}
+
+				d = v;
+
+				l = matrix(DIM, 1, 0.0);
+				p = matrix(DIM, 1, 0.0);
+				s = s0;
+			}
+			if (solution::f_calls > Nmax)
+			{
+				Xopt.flag = -2;
+				break;
+			}
+			ud.add_col(Xopt.x);
+			max_s = 0;
+			for (int j = 1; j < DIM; j++)
+			{
+				if (abs(s(max_s)) < abs(s(j)))
+				{
+					max_s = j;
+				}
+			}
+
+		} while (abs(s(max_s)) >= epsilon);
+		Xopt.ud = ud;
+		return Xopt;
+
+	}
+	catch (string ex_info)
+	{
+		throw ("solution Rosen(...):\n" + ex_info);
+	}
+}
+
+//penalty
+
+solution pen(matrix(*ff)(matrix, matrix, matrix), matrix x0, double c, double dc, double epsilon, int Nmax, matrix ud1, matrix ud2)
+{
+	try {
+
+		solution xi(x0), x_i;
+		xi.flag = 0;
+		matrix init_v_S(2, 1);
+		init_v_S(0) = c;
+		init_v_S(1) = ud2(0);
+		double nm = 0;
+		//double tmp1 = m2d(ff3T(xi.x)), tmp2;
+		do
+		{
+			x_i = xi;
+
+			//tmp2 = tmp1;
+
+			xi = sym_NM(ff,xi.x,ud1(0),ud1(1),ud1(2),ud1(3), ud1(4), ud1(5), Nmax, init_v_S);
+
+			//tmp1 = m2d(ff3T(xi.x));
+//std::c                                                   out << "PEN:\nx:" << x_i.x(0) << " " << x_i.x(1) << " y: " << xi.y << "\nx:" << xi.x(0) << " " << xi.x(1) << " y: " << xi.y << "\n";
+
+			init_v_S(0) = init_v_S(0) * dc;
+
+			if (solution::f_calls > Nmax)
+			{
+				xi.flag = -2;
+				break;
+			}
+			if (dc < 1.0)
+			{
+				double sum = 0.0;
+				sum += 1 / m2d(g1(xi.x, NAN));
+				sum += 1 / m2d(g2(xi.x, NAN));
+				sum += 1 / m2d(g3(xi.x, init_v_S(1)));
+				if (c * fabs(sum) < epsilon)
+					break;
+			}
+
+			nm = norm(xi.x - x_i.x);
+
+		} while (nm >= epsilon);
+
+		return xi;
+	}
+	catch (string ex_info)
+	{
+		throw ("matrix pen(...):\n" + ex_info);
 	}
 }
 
@@ -735,9 +948,117 @@ solution sym_NM(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double
 {
 	try
 	{
-		solution Xopt;
-		//Tu wpisz kod funkcji
 
+		solution Xopt;
+		int g_min = 0;
+		Xopt.flag = 0;
+		// set function's dimension
+		const int DIM = 2;
+		// set initial matrixes
+		matrix p(DIM, 1 + DIM); // DIM (points' dimension) x DIM+1 (points' amount) square point matrix
+		matrix e = ident_mat(DIM); // DIM x DIM square identity matrix
+
+		p.set_col(x0, 0); // p0 = x0
+		for (int i = 1; i <= DIM; i++)
+			p.set_col(p[0] + e[i-1] * s, i); //pi = p0 + ei*s
+
+		solution::f_calls += 1 + DIM;
+		matrix p_f(DIM+1, 1);
+		for (int i = 0; i <= DIM; i++)
+			p_f(i) = m2d(ff(p[i], ud1, NAN)); // returns matrix 1x1
+
+		double max_norm;
+		do {
+			max_norm = 0.0;
+			int p_max = 0, p_min = 0;
+			for (int i = 1; i <= DIM; i++) {
+				if (p_f(p_max) < p_f(i)) p_max = i;
+				if (p_f(p_min) > p_f(i)) p_min = i;
+			}
+			if (p_max == p_min)
+				p_max = (p_max+1)%(DIM+1);
+
+			matrix p_s(DIM,1); // _p
+			for (int i = 0; i <= DIM; i++)
+			{
+				if (i == p_max) continue;
+				p_s.set_col(p_s[0] + p[i], 0); // _p = E(i!=max) pi
+			}
+
+			p_s.set_col(p_s[0] / DIM, 0);  // _p /= n
+			matrix p_odb = p_s[0] + (p_s[0] - p[p_max]) * alpha; // p_odb = _p + a(_p - p_max)
+
+			solution::f_calls++;
+			double p_odb_f = m2d(ff(p_odb, ud1, NAN)); // returns matrix 1x1
+
+			if (m2d(p_odb_f) < p_f(p_max))
+			{
+				matrix p_e = p_s + (p_odb[0] - p_s[0]) * gamma;
+
+				solution::f_calls++;
+				double p_e_f = m2d(ff(p_e, ud1, NAN));
+
+				if (ff(p_e, ud1, NAN) < p_odb_f)
+				{
+					p.set_col(p_e[0], p_max);
+					p_f(p_max) = p_e_f;
+				}
+				else
+				{
+					p.set_col(p_odb[0], p_max);
+					p_f(p_max) = p_odb_f;
+				}
+			}
+			else
+			{
+				if (p_f(p_min) <= p_odb_f && p_odb_f < p_f(p_max))
+				{
+					p.set_col(p_odb[0], p_max);
+					p_f(p_max) = p_odb(0);
+				}
+				else
+				{
+					matrix p_z = p_s[0] + (p[p_max] - p_s[0])*beta;
+
+					solution::f_calls++;
+					double p_z_f = m2d(ff(p_z, ud1, NAN));
+
+					if (p_z_f >= p_f(p_max))
+					{
+						for (int i = 0; i <= DIM; i++)
+						{
+							if (i == p_min) continue;
+							p.set_col((p[i] + p[p_min]) * delta, i);
+							solution::f_calls++;
+							p_f(i) = m2d(ff(p[i], ud1, NAN));
+						}
+					}
+					else
+					{
+						p.set_col(p_z[0], p_max);
+						p_f(p_max) = p_z_f;
+					}
+				}
+			}
+			g_min = p_min;
+			if (solution::f_calls > Nmax)
+			{
+				Xopt.flag = -2;
+				break;
+				//throw("Nie znaleziono przedzialu po Nmax probach (f_calls > Nmax)\n");
+			}
+			for (int i = 0; i <= DIM; i++)
+			{
+				if (i == p_min) continue;
+				double i_norm = norm(p[p_min] - p[i]);
+				if (i_norm > max_norm)
+					max_norm = i_norm;
+			}
+			//std::cout << max_norm << std::endl;
+		} while (max_norm >= epsilon);
+		Xopt.x = p[g_min];
+		Xopt.y = p_f(g_min);
+//std::cout << "NM: " << Xopt << std::endl;
 		return Xopt;
 	}
 	catch (string ex_info)
@@ -745,6 +1066,7 @@ solution sym_NM(matrix(*ff)(matrix, matrix, matrix), matrix x0, double s, double
 		throw ("solution sym_NM(...):\n" + ex_info);
 	}
 }
+
 
 solution SD(matrix(*ff)(matrix, matrix, matrix), matrix(*gf)(matrix, matrix, matrix), matrix x0, double h0, double epsilon, int Nmax, matrix ud1, matrix ud2)
 {
